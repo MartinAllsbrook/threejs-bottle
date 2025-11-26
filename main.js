@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -65,25 +66,37 @@ const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
 const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
 scene.add(cubeCamera);
 
-// Glass cube with refraction
-const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
-const cubeMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    metalness: 0.0,
-    roughness: 0.0,
-    transmission: 1.0,
-    thickness: 0.5,
-    envMap: cubeRenderTarget.texture,
-    envMapIntensity: 1.0,
-    transparent: true,
-    opacity: 1.0,
-    ior: 1.5,
-    reflectivity: 0.5,
+// Load bottle GLB model
+let bottle = null;
+const loader = new GLTFLoader();
+loader.load('static/OGBottle.glb', (gltf) => {
+    bottle = gltf.scene;
+    
+    // // Apply glass material with refraction to all meshes in the bottle
+    // bottle.traverse((child) => {
+    //     if (child.isMesh) {
+    //         child.material = new THREE.MeshPhysicalMaterial({
+    //             color: 0xffffff,
+    //             metalness: 0.0,
+    //             roughness: 0.0,
+    //             transmission: 1.0,
+    //             thickness: 0.5,
+    //             envMap: cubeRenderTarget.texture,
+    //             envMapIntensity: 1.0,
+    //             transparent: true,
+    //             opacity: 1.0,
+    //             ior: 1.5,
+    //             reflectivity: 0.5,
+    //         });
+    //     }
+    // });
+    
+    bottle.position.z = 2;
+    bottle.scale.set(10, 10, 10);
+    scene.add(bottle);
+}, undefined, (error) => {
+    console.error('Error loading bottle model:', error);
 });
-
-const glassCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-glassCube.position.z = 2;
-scene.add(glassCube);
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -108,19 +121,21 @@ function animate() {
     
     time += 0.01;
     
-    // Oscillate cube back and forth (X-axis) and up and down (Y-axis)
-    glassCube.position.x = Math.sin(time * 0.8) * 1.5;
-    glassCube.position.y = Math.sin(time * 1.2) * 0.5;
-    
-    // Rotate cube slightly for more visual interest
-    glassCube.rotation.y += 0.005;
-    glassCube.rotation.x += 0.003;
-    
-    // Update cube camera for refraction effect
-    glassCube.visible = false;
-    cubeCamera.position.copy(glassCube.position);
-    cubeCamera.update(renderer, scene);
-    glassCube.visible = true;
+    if (bottle) {
+        // Oscillate bottle back and forth (X-axis) and up and down (Y-axis)
+        bottle.position.x = Math.sin(time * 0.8) * 1.5;
+        bottle.position.y = Math.sin(time * 1.2) * 0.5;
+        
+        // Rotate bottle slightly for more visual interest
+        bottle.rotation.y += 0.005;
+        bottle.rotation.x += 0.003;
+        
+        // Update cube camera for refraction effect
+        bottle.visible = false;
+        cubeCamera.position.copy(bottle.position);
+        cubeCamera.update(renderer, scene);
+        bottle.visible = true;
+    }
     
     renderer.render(scene, camera);
 }
