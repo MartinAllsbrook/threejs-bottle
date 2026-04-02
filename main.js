@@ -32,28 +32,7 @@ const videoPlane = new THREE.Mesh(planeGeometry, planeMaterial);
 videoPlane.position.z = -5;
 scene.add(videoPlane);
 
-// Function to update video plane size to cover screen
-function updateVideoPlaneSize() {
-    const distance = Math.abs(videoPlane.position.z - camera.position.z);
-    const vFov = camera.fov * Math.PI / 180;
-    const planeHeight = 2 * Math.tan(vFov / 2) * distance;
-    const planeWidth = planeHeight * camera.aspect;
-    
-    // Video aspect ratio is 16:9
-    const videoAspect = 16 / 9;
-    const screenAspect = camera.aspect;
-    
-    // Scale to cover the screen (crop instead of squish)
-    if (screenAspect > videoAspect) {
-        // Screen is wider than video, fit to width
-        const scale = planeWidth / 16;
-        videoPlane.scale.set(scale, scale, 1);
-    } else {
-        // Screen is taller than video, fit to height
-        const scale = planeHeight / 9;
-        videoPlane.scale.set(scale, scale, 1);
-    }
-}
+
 
 // Create cube render target for refraction
 const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
@@ -72,24 +51,24 @@ const loader = new GLTFLoader();
 loader.load('static/OGBottle.glb', (gltf) => {
     bottle = gltf.scene;
     
-    // // Apply glass material with refraction to all meshes in the bottle
-    // bottle.traverse((child) => {
-    //     if (child.isMesh) {
-    //         child.material = new THREE.MeshPhysicalMaterial({
-    //             color: 0xffffff,
-    //             metalness: 0.0,
-    //             roughness: 0.0,
-    //             transmission: 1.0,
-    //             thickness: 0.5,
-    //             envMap: cubeRenderTarget.texture,
-    //             envMapIntensity: 1.0,
-    //             transparent: true,
-    //             opacity: 1.0,
-    //             ior: 1.5,
-    //             reflectivity: 0.5,
-    //         });
-    //     }
-    // });
+    // Apply glass material with refraction to all meshes in the bottle
+    bottle.traverse((child) => {
+        if (child.isMesh) {
+            child.material = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff,
+                metalness: 0.0,
+                roughness: 0.0,
+                transmission: 1.0,
+                thickness: 7.0,
+                envMap: cubeRenderTarget.texture,
+                envMapIntensity: 1.0,
+                transparent: true,
+                opacity: 1.0,
+                ior: 1.5,
+                reflectivity: 0.5,
+            });
+        }
+    });
     
     bottle.position.z = 2;
     bottle.scale.set(10, 10, 10);
@@ -114,6 +93,17 @@ updateVideoPlaneSize();
 
 // Animation variables
 let time = 0;
+
+// Start animation
+animate();
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    updateVideoPlaneSize();
+});
 
 // Animation loop
 function animate() {
@@ -140,13 +130,25 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    updateVideoPlaneSize();
-});
-
-// Start animation
-animate();
+// Function to update video plane size to cover screen
+function updateVideoPlaneSize() {
+    const distance = Math.abs(videoPlane.position.z - camera.position.z);
+    const vFov = camera.fov * Math.PI / 180;
+    const planeHeight = 2 * Math.tan(vFov / 2) * distance;
+    const planeWidth = planeHeight * camera.aspect;
+    
+    // Video aspect ratio is 16:9
+    const videoAspect = 16 / 9;
+    const screenAspect = camera.aspect;
+    
+    // Scale to cover the screen (crop instead of squish)
+    if (screenAspect > videoAspect) {
+        // Screen is wider than video, fit to width
+        const scale = planeWidth / 16;
+        videoPlane.scale.set(scale, scale, 1);
+    } else {
+        // Screen is taller than video, fit to height
+        const scale = planeHeight / 9;
+        videoPlane.scale.set(scale, scale, 1);
+    }
+}
