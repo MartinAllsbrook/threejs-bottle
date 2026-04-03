@@ -22,6 +22,9 @@ videoTexture.minFilter = THREE.LinearFilter;
 videoTexture.magFilter = THREE.LinearFilter;
 videoTexture.format = THREE.RGBAFormat;
 
+
+//#region Background video and refraction setup
+
 // Background plane with video
 const planeGeometry = new THREE.PlaneGeometry(16, 9);
 const planeMaterial = new THREE.MeshBasicMaterial({ 
@@ -31,8 +34,6 @@ const planeMaterial = new THREE.MeshBasicMaterial({
 const videoPlane = new THREE.Mesh(planeGeometry, planeMaterial);
 videoPlane.position.z = -5;
 scene.add(videoPlane);
-
-
 
 // Create cube render target for refraction
 const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
@@ -45,28 +46,55 @@ const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
 const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
 scene.add(cubeCamera);
 
-// Load bottle GLB model
+//#endregion
+
+
+
+//#region Load bottle GLB model
+
+console.log('Loading bottle model...');
 let bottle = null;
 const loader = new GLTFLoader();
-loader.load('static/OGBottle.glb', (gltf) => {
-    bottle = gltf.scene;
+
+const bottleLoadStartTime = performance.now();
+
+const bottleNormalMap = new THREE.TextureLoader().load('static/bottle_normal_map.png');
+bottleNormalMap.mapping = THREE.UVMapping;
+bottleNormalMap.wrapS = THREE.RepeatWrapping;
+bottleNormalMap.wrapT = THREE.RepeatWrapping;
+bottleNormalMap.repeat.set(1, -1);
+
+const glassMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.0,
+    roughness: 0.0,
+    transmission: 1.0,
+    thickness: 1.0,
+    envMap: cubeRenderTarget.texture,
+    envMapIntensity: 1.0,
+    transparent: true,
+    opacity: 1,
+    ior: 1.5,
+    reflectivity: 0.1,
+    normalMap: bottleNormalMap,
+});
+
+loader.load('static/Optimized.glb', (gltf) => {
+    const bottleLoadEndTime = performance.now();
+    console.log(`Bottle loaded in ${(bottleLoadEndTime - bottleLoadStartTime).toFixed(2)}ms`);
     
+    bottle = gltf.scene;
+
+    console.log(bottle);
+    
+    for (const child of bottle.children) {
+        console.log(child);
+    }
+
     // Apply glass material with refraction to all meshes in the bottle
     bottle.traverse((child) => {
         if (child.isMesh) {
-            child.material = new THREE.MeshPhysicalMaterial({
-                color: 0xffffff,
-                metalness: 0.0,
-                roughness: 0.0,
-                transmission: 1.0,
-                thickness: 7.0,
-                envMap: cubeRenderTarget.texture,
-                envMapIntensity: 1.0,
-                transparent: true,
-                opacity: 1.0,
-                ior: 1.5,
-                reflectivity: 0.5,
-            });
+            child.material = glassMaterial;
         }
     });
     
@@ -77,7 +105,10 @@ loader.load('static/OGBottle.glb', (gltf) => {
     console.error('Error loading bottle model:', error);
 });
 
-// Lighting
+//#endregion
+
+//#region Lighting
+
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
 scene.add(ambientLight);
 
@@ -85,8 +116,12 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
 directionalLight.position.set(5, 5, 5);
 scene.add(directionalLight);
 
+//#endregion
+
 // Position camera
-camera.position.z = 7;
+camera.position.z = 10;
+camera.fov = 40;
+camera.updateProjectionMatrix();
 
 // Set initial video plane size
 updateVideoPlaneSize();
@@ -112,15 +147,16 @@ function animate() {
     time += 0.01;
     
     if (bottle) {
-        // Oscillate bottle back and forth (X-axis) and up and down (Y-axis)
-        bottle.position.x = Math.sin(time * 0.8) * 1.5;
-        bottle.position.y = Math.sin(time * 1.2) * 0.5;
+        // Position
+        // bottle.position.x = Math.sin(time * 0.8) * 0.2;
+        bottle.position.y = -1.5;
         
-        // Rotate bottle slightly for more visual interest
-        bottle.rotation.y += 0.005;
-        bottle.rotation.x += 0.003;
+        // Rotation
+        bottle.rotation.y = time * -0.3;
+        bottle.rotation.y = Math.sin(time * 0.3) * 1.5;
+        // bottle.rotation.x += Math.sin(time * 1.2) * 0.002;
         
-        // Update cube camera for refraction effect
+        // Refraction update
         bottle.visible = false;
         cubeCamera.position.copy(bottle.position);
         cubeCamera.update(renderer, scene);
