@@ -70,7 +70,7 @@ const glassMaterial = new THREE.MeshPhysicalMaterial({
     metalness: 0.0,
     roughness: 0.0,
     transmission: 1.0,
-    thickness: 0.25,
+    thickness: 0.1,
     envMap: cubeRenderTarget.texture,
     envMapIntensity: 1.0,
     transparent: true,
@@ -80,25 +80,31 @@ const glassMaterial = new THREE.MeshPhysicalMaterial({
     normalMap: bottleNormalMap,
 });
 
-const frontLabelTexture = new THREE.TextureLoader().load('static/Front512.png');
+const frontLabelTexture = new THREE.TextureLoader().load('static/FrontLabel.png');
 frontLabelTexture.flipY = false;
 frontLabelTexture.mapping = THREE.UVMapping;
 
-const backOutsideLabelTexture = new THREE.TextureLoader().load('static/BackOuter512.png');
-backOutsideLabelTexture.flipY = false;
-backOutsideLabelTexture.mapping = THREE.UVMapping;
+const backLabelTexture = new THREE.TextureLoader().load('static/BackLabel.png');
+backLabelTexture.flipY = false;
+backLabelTexture.mapping = THREE.UVMapping;
 
-const backInsideLabelTexture = new THREE.TextureLoader().load('static/BackInner512.png');
-backInsideLabelTexture.flipY = false;
-backInsideLabelTexture.mapping = THREE.UVMapping;
-
-
-const frontLabelMaterial = new THREE.MeshPhysicalMaterial({
+const frontOutsideLabelMaterial = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     metalness: 0.0,
     roughness: 0.5,
     envMap: cubeRenderTarget.texture,
     transparent: true,
+    envMapIntensity: 0.5,
+    alphaTest: 0.01,
+    reflectivity: 0.1,
+    map: frontLabelTexture,
+});
+
+const frontInsideLabelMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.0,
+    roughness: 0.5,
+    envMap: cubeRenderTarget.texture,
     envMapIntensity: 0.5,
     alphaTest: 0.01,
     reflectivity: 0.1,
@@ -114,7 +120,7 @@ const backOutsideLabelMaterial = new THREE.MeshPhysicalMaterial({
     envMapIntensity: 0.5,
     alphaTest: 0.01,
     reflectivity: 0.1,
-    map: backOutsideLabelTexture,
+    map: backLabelTexture,
 });
 
 const backInsideLabelMaterial = new THREE.MeshPhysicalMaterial({
@@ -125,7 +131,23 @@ const backInsideLabelMaterial = new THREE.MeshPhysicalMaterial({
     envMapIntensity: 0.5,
     alphaTest: 0.01,
     reflectivity: 0.1,
-    map: backInsideLabelTexture,
+    map: backLabelTexture,
+});
+
+const capTexture = new THREE.TextureLoader().load('static/CapTexture.png');
+capTexture.flipY = false;
+capTexture.mapping = THREE.UVMapping;
+
+const capMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.0,
+    roughness: 0.5,
+    envMap: cubeRenderTarget.texture,
+    transparent: true,
+    envMapIntensity: 0.5,
+    alphaTest: 0.01,
+    reflectivity: 0.1,
+    map: capTexture,
 });
 
 loader.load('static/Bottle.glb', (gltf) => {
@@ -143,15 +165,22 @@ loader.load('static/Bottle.glb', (gltf) => {
     // Apply glass material with refraction to all meshes in the bottle
     bottle.traverse((child) => {
         if (child.isMesh) {
-            if (child.name.includes('Front')) {
-                child.material = frontLabelMaterial;
+            console.log(`Processing mesh: ${child.name}`);
+            if (child.name.includes('Front_Inside')) {
+                child.material = frontInsideLabelMaterial;
                 child.renderOrder = 0;
-            } else if (child.name.includes('Outside')) {
-                child.material = backOutsideLabelMaterial;
+            } else if (child.name.includes('Front_Outside')) {
+                child.material = frontOutsideLabelMaterial;
                 child.renderOrder = 0;
-            } else if (child.name.includes('Inside')) {
+            } else if (child.name.includes('Back_Inside')) {
                 child.material = backInsideLabelMaterial;
                 child.renderOrder = 0;
+            } else if (child.name.includes('Back_Outside')) {
+                child.material = backOutsideLabelMaterial;
+                child.renderOrder = 0;
+            } else if (child.name.includes('Cap')) {
+                child.material = capMaterial;
+                child.renderOrder = 1;
             } else {
                 child.material = glassMaterial;
                 child.renderOrder = 1;
@@ -214,7 +243,7 @@ function animate() {
         
         // Rotation
         bottle.rotation.y = time * -0.3;
-        bottle.rotation.y = Math.sin(time * 0.3) * 3;
+        bottle.rotation.y = Math.sin(time * 0.3) * 1.5;
         // bottle.rotation.x += Math.sin(time * 1.2) * 0.002;
         
         // Refraction update
