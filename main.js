@@ -43,7 +43,7 @@ const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
 });
 
 // Cube camera for environment mapping
-const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
+const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeRenderTarget);
 scene.add(cubeCamera);
 
 //#endregion
@@ -54,11 +54,12 @@ scene.add(cubeCamera);
 
 console.log('Loading bottle model...');
 let bottle = null;
+let bottle2 = null;
 const loader = new GLTFLoader();
 
 const bottleLoadStartTime = performance.now();
 
-const bottleNormalMap = new THREE.TextureLoader().load('static/bottle_normal_map.png');
+const bottleNormalMap = new THREE.TextureLoader().load('static/GlassNormal.png');
 bottleNormalMap.mapping = THREE.UVMapping;
 bottleNormalMap.wrapS = THREE.RepeatWrapping;
 bottleNormalMap.wrapT = THREE.RepeatWrapping;
@@ -69,17 +70,65 @@ const glassMaterial = new THREE.MeshPhysicalMaterial({
     metalness: 0.0,
     roughness: 0.0,
     transmission: 1.0,
-    thickness: 1.0,
+    thickness: 0.25,
     envMap: cubeRenderTarget.texture,
     envMapIntensity: 1.0,
     transparent: true,
     opacity: 1,
     ior: 1.5,
-    reflectivity: 0.1,
+    reflectivity: 0.3,
     normalMap: bottleNormalMap,
 });
 
-loader.load('static/Optimized.glb', (gltf) => {
+const frontLabelTexture = new THREE.TextureLoader().load('static/Front512.png');
+frontLabelTexture.flipY = false;
+frontLabelTexture.mapping = THREE.UVMapping;
+
+const backOutsideLabelTexture = new THREE.TextureLoader().load('static/BackOuter512.png');
+backOutsideLabelTexture.flipY = false;
+backOutsideLabelTexture.mapping = THREE.UVMapping;
+
+const backInsideLabelTexture = new THREE.TextureLoader().load('static/BackInner512.png');
+backInsideLabelTexture.flipY = false;
+backInsideLabelTexture.mapping = THREE.UVMapping;
+
+
+const frontLabelMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.0,
+    roughness: 0.5,
+    envMap: cubeRenderTarget.texture,
+    transparent: true,
+    envMapIntensity: 0.5,
+    alphaTest: 0.01,
+    reflectivity: 0.1,
+    map: frontLabelTexture,
+});
+
+const backOutsideLabelMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.0,
+    roughness: 0.5,
+    envMap: cubeRenderTarget.texture,
+    transparent: true,
+    envMapIntensity: 0.5,
+    alphaTest: 0.01,
+    reflectivity: 0.1,
+    map: backOutsideLabelTexture,
+});
+
+const backInsideLabelMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.0,
+    roughness: 0.5,
+    envMap: cubeRenderTarget.texture,
+    envMapIntensity: 0.5,
+    alphaTest: 0.01,
+    reflectivity: 0.1,
+    map: backInsideLabelTexture,
+});
+
+loader.load('static/Bottle.glb', (gltf) => {
     const bottleLoadEndTime = performance.now();
     console.log(`Bottle loaded in ${(bottleLoadEndTime - bottleLoadStartTime).toFixed(2)}ms`);
     
@@ -94,7 +143,19 @@ loader.load('static/Optimized.glb', (gltf) => {
     // Apply glass material with refraction to all meshes in the bottle
     bottle.traverse((child) => {
         if (child.isMesh) {
-            child.material = glassMaterial;
+            if (child.name.includes('Front')) {
+                child.material = frontLabelMaterial;
+                child.renderOrder = 0;
+            } else if (child.name.includes('Outside')) {
+                child.material = backOutsideLabelMaterial;
+                child.renderOrder = 0;
+            } else if (child.name.includes('Inside')) {
+                child.material = backInsideLabelMaterial;
+                child.renderOrder = 0;
+            } else {
+                child.material = glassMaterial;
+                child.renderOrder = 1;
+            }
         }
     });
     
@@ -103,7 +164,7 @@ loader.load('static/Optimized.glb', (gltf) => {
     scene.add(bottle);
 }, undefined, (error) => {
     console.error('Error loading bottle model:', error);
-});
+}); 
 
 //#endregion
 
@@ -153,14 +214,14 @@ function animate() {
         
         // Rotation
         bottle.rotation.y = time * -0.3;
-        bottle.rotation.y = Math.sin(time * 0.3) * 1.5;
+        bottle.rotation.y = Math.sin(time * 0.3) * 3;
         // bottle.rotation.x += Math.sin(time * 1.2) * 0.002;
         
         // Refraction update
-        bottle.visible = false;
+        // bottle.visible = false;
         cubeCamera.position.copy(bottle.position);
         cubeCamera.update(renderer, scene);
-        bottle.visible = true;
+        // bottle.visible = true;
     }
     
     renderer.render(scene, camera);
