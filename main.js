@@ -1,280 +1,205 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// Scene setup
+// --- Globals ---
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xFFFAEC);
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-document.body.appendChild(renderer.domElement);
 
-// Video setup
-const video = document.createElement('video');
-video.src = 'static/ip-trimmed-drone.mp4';
-video.loop = true;
-video.muted = true;
-video.playsInline = true;
-video.play();
-
-const videoTexture = new THREE.VideoTexture(video);
-videoTexture.minFilter = THREE.LinearFilter;
-videoTexture.magFilter = THREE.LinearFilter;
-videoTexture.format = THREE.RGBAFormat;
-
-
-//#region Background video and refraction setup
-
-// Background plane with video
-const planeGeometry = new THREE.PlaneGeometry(16, 9);
-const planeMaterial = new THREE.MeshBasicMaterial({ 
-    map: videoTexture,
-    side: THREE.DoubleSide
-});
-const videoPlane = new THREE.Mesh(planeGeometry, planeMaterial);
-videoPlane.position.z = -5;
-scene.add(videoPlane);
-
-// Create cube render target for refraction
 const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
     format: THREE.RGBAFormat,
     generateMipmaps: true,
     minFilter: THREE.LinearMipmapLinearFilter
 });
-
-// Cube camera for environment mapping
 const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeRenderTarget);
-scene.add(cubeCamera);
 
-//#endregion
-
-
-
-//#region Load bottle GLB model
-
-console.log('Loading bottle model...');
 let bottle = null;
-let bottle2 = null;
-const loader = new GLTFLoader();
-
-const bottleLoadStartTime = performance.now();
-
-const bottleNormalMap = new THREE.TextureLoader().load('static/GlassNormal.png');
-bottleNormalMap.mapping = THREE.UVMapping;
-bottleNormalMap.wrapS = THREE.RepeatWrapping;
-bottleNormalMap.wrapT = THREE.RepeatWrapping;
-bottleNormalMap.repeat.set(1, -1);
-
-const glassMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    metalness: 0.0,
-    roughness: 0.0,
-    transmission: 1.0,
-    thickness: 0.1,
-    envMap: cubeRenderTarget.texture,
-    envMapIntensity: 1.0,
-    transparent: true,
-    opacity: 1,
-    ior: 1.5,
-    reflectivity: 0.3,
-    normalMap: bottleNormalMap,
-});
-
-const frontLabelTexture = new THREE.TextureLoader().load('static/FrontLabel.png');
-frontLabelTexture.flipY = false;
-frontLabelTexture.mapping = THREE.UVMapping;
-
-const backLabelTexture = new THREE.TextureLoader().load('static/BackLabel.png');
-backLabelTexture.flipY = false;
-backLabelTexture.mapping = THREE.UVMapping;
-
-const frontOutsideLabelMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    metalness: 0.0,
-    roughness: 0.5,
-    envMap: cubeRenderTarget.texture,
-    transparent: true,
-    envMapIntensity: 0.5,
-    alphaTest: 0.01,
-    reflectivity: 0.1,
-    map: frontLabelTexture,
-});
-
-const frontInsideLabelMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    metalness: 0.0,
-    roughness: 0.5,
-    envMap: cubeRenderTarget.texture,
-    envMapIntensity: 0.5,
-    alphaTest: 0.01,
-    reflectivity: 0.1,
-    map: frontLabelTexture,
-});
-
-const backOutsideLabelMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    metalness: 0.0,
-    roughness: 0.5,
-    envMap: cubeRenderTarget.texture,
-    transparent: true,
-    envMapIntensity: 0.5,
-    alphaTest: 0.01,
-    reflectivity: 0.1,
-    map: backLabelTexture,
-});
-
-const backInsideLabelMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    metalness: 0.0,
-    roughness: 0.5,
-    envMap: cubeRenderTarget.texture,
-    envMapIntensity: 0.5,
-    alphaTest: 0.01,
-    reflectivity: 0.1,
-    map: backLabelTexture,
-});
-
-const capTexture = new THREE.TextureLoader().load('static/CapTexture.png');
-capTexture.flipY = false;
-capTexture.mapping = THREE.UVMapping;
-
-const capMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    metalness: 0.0,
-    roughness: 0.5,
-    envMap: cubeRenderTarget.texture,
-    transparent: true,
-    envMapIntensity: 0.5,
-    alphaTest: 0.01,
-    reflectivity: 0.1,
-    map: capTexture,
-});
-
-loader.load('static/Bottle.glb', (gltf) => {
-    const bottleLoadEndTime = performance.now();
-    console.log(`Bottle loaded in ${(bottleLoadEndTime - bottleLoadStartTime).toFixed(2)}ms`);
-    
-    bottle = gltf.scene;
-
-    console.log(bottle);
-    
-    for (const child of bottle.children) {
-        console.log(child);
-    }
-
-    // Apply glass material with refraction to all meshes in the bottle
-    bottle.traverse((child) => {
-        if (child.isMesh) {
-            console.log(`Processing mesh: ${child.name}`);
-            if (child.name.includes('Front_Inside')) {
-                child.material = frontInsideLabelMaterial;
-                child.renderOrder = 0;
-            } else if (child.name.includes('Front_Outside')) {
-                child.material = frontOutsideLabelMaterial;
-                child.renderOrder = 0;
-            } else if (child.name.includes('Back_Inside')) {
-                child.material = backInsideLabelMaterial;
-                child.renderOrder = 0;
-            } else if (child.name.includes('Back_Outside')) {
-                child.material = backOutsideLabelMaterial;
-                child.renderOrder = 0;
-            } else if (child.name.includes('Cap')) {
-                child.material = capMaterial;
-                child.renderOrder = 1;
-            } else {
-                child.material = glassMaterial;
-                child.renderOrder = 1;
-            }
-        }
-    });
-    
-    bottle.position.z = 2;
-    bottle.scale.set(10, 10, 10);
-    scene.add(bottle);
-}, undefined, (error) => {
-    console.error('Error loading bottle model:', error);
-}); 
-
-//#endregion
-
-//#region Lighting
-
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-directionalLight.position.set(5, 5, 5);
-scene.add(directionalLight);
-
-//#endregion
-
-// Position camera
-camera.position.z = 10;
-camera.fov = 40;
-camera.updateProjectionMatrix();
-
-// Set initial video plane size
-updateVideoPlaneSize();
-
-// Animation variables
+let videoPlane = null;
 let time = 0;
 
-// Start animation
-animate();
+// --- Entry point ---
+init();
 
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+// --- Functions ---
+
+async function init() {
+    initRenderer();
+    scene.add(cubeCamera);
+    initLighting();
+    await Promise.all([loadBottle(), setupVideoBackground()]);
+    camera.position.z = 10;
+    camera.fov = 40;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
     updateVideoPlaneSize();
-});
+    window.addEventListener('resize', onResize);
+    animate();
+}
 
-// Animation loop
+function initRenderer() {
+    const videoContainer = document.getElementsByClassName('video-content')[0];
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    videoContainer.appendChild(renderer.domElement);
+}
+
+function initLighting() {
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+}
+
+async function loadBottle() {
+    const textureLoader = new THREE.TextureLoader();
+
+    const bottleNormalMap = textureLoader.load('https://cdn.shopify.com/s/files/1/0565/4472/3021/files/GlassNormal.png?v=1776176035');
+    bottleNormalMap.mapping = THREE.UVMapping;
+    bottleNormalMap.wrapS = THREE.RepeatWrapping;
+    bottleNormalMap.wrapT = THREE.RepeatWrapping;
+    bottleNormalMap.repeat.set(1, -1);
+
+    const frontLabelTexture = textureLoader.load('https://cdn.shopify.com/s/files/1/0565/4472/3021/files/FrontLabel.png?v=1776176032');
+    frontLabelTexture.flipY = false;
+    frontLabelTexture.mapping = THREE.UVMapping;
+
+    const backLabelTexture = textureLoader.load('https://cdn.shopify.com/s/files/1/0565/4472/3021/files/BackLabel.png?v=1776176035');
+    backLabelTexture.flipY = false;
+    backLabelTexture.mapping = THREE.UVMapping;
+
+    const capTexture = textureLoader.load('https://cdn.shopify.com/s/files/1/0565/4472/3021/files/CapTexture.png?v=1776176033');
+    capTexture.flipY = false;
+    capTexture.mapping = THREE.UVMapping;
+
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0.0,
+        roughness: 0.0,
+        transmission: 1.0,
+        thickness: 0.1,
+        envMap: cubeRenderTarget.texture,
+        envMapIntensity: 1.0,
+        transparent: true,
+        opacity: 1,
+        ior: 1.5,
+        reflectivity: 0.3,
+        normalMap: bottleNormalMap,
+    });
+
+    const sharedLabelProps = {
+        color: 0xffffff,
+        metalness: 0.0,
+        roughness: 0.5,
+        envMap: cubeRenderTarget.texture,
+        envMapIntensity: 0.5,
+        alphaTest: 0.01,
+        reflectivity: 0.1,
+    };
+
+    const materialMap = {
+        Front_Inside:  { material: new THREE.MeshPhysicalMaterial({ ...sharedLabelProps, map: frontLabelTexture }),                renderOrder: 0 },
+        Front_Outside: { material: new THREE.MeshPhysicalMaterial({ ...sharedLabelProps, map: frontLabelTexture, transparent: true }), renderOrder: 0 },
+        Back_Inside:   { material: new THREE.MeshPhysicalMaterial({ ...sharedLabelProps, map: backLabelTexture }),                 renderOrder: 0 },
+        Back_Outside:  { material: new THREE.MeshPhysicalMaterial({ ...sharedLabelProps, map: backLabelTexture, transparent: true }),  renderOrder: 0 },
+        Cap:           { material: new THREE.MeshPhysicalMaterial({ ...sharedLabelProps, map: capTexture, transparent: true }),    renderOrder: 1 },
+    };
+
+    return new Promise((resolve, reject) => {
+        new GLTFLoader().load('https://cdn.shopify.com/3d/models/9f0541156f356a39/Bottle.glb', (gltf) => {
+            bottle = gltf.scene;
+
+            bottle.traverse((child) => {
+                if (!child.isMesh) return;
+                const match = Object.keys(materialMap).find(key => child.name.includes(key));
+                if (match) {
+                    child.material = materialMap[match].material;
+                    child.renderOrder = materialMap[match].renderOrder;
+                } else {
+                    child.material = glassMaterial;
+                    child.renderOrder = 1;
+                }
+            });
+
+            bottle.position.set(0, -2.1, 2);
+            bottle.scale.setScalar(14);
+            scene.add(bottle);
+            resolve();
+        }, undefined, reject);
+    });
+}
+
+function setupVideoBackground() {
+    const video = document.createElement('video');
+    video.src = '//isolation-staging.myshopify.com/cdn/shop/videos/c/vp/989e9c7f98e749c1b3e037c7f3df1633/989e9c7f98e749c1b3e037c7f3df1633.HD-720p-4.5Mbps-81117813.mp4?v=0';
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.play();
+
+    const videoTexture = new THREE.VideoTexture(video);
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+    videoTexture.format = THREE.RGBAFormat;
+
+    const planeMaterial = new THREE.MeshBasicMaterial({
+        map: videoTexture,
+        side: THREE.DoubleSide,
+        color: 0xFFFAEC,
+    });
+
+    videoPlane = new THREE.Mesh(new THREE.PlaneGeometry(16, 9), planeMaterial);
+    videoPlane.position.z = -5;
+    scene.add(videoPlane);
+}
+
 function animate() {
     requestAnimationFrame(animate);
-    
+
     time += 0.01;
-    
+
     if (bottle) {
-        // Position
-        // bottle.position.x = Math.sin(time * 0.8) * 0.2;
-        bottle.position.y = -1.5;
-        
-        // Rotation
-        bottle.rotation.y = time * -0.3;
         bottle.rotation.y = Math.sin(time * 0.3) * 1.5;
-        // bottle.rotation.x += Math.sin(time * 1.2) * 0.002;
-        
-        // Refraction update
-        // bottle.visible = false;
         cubeCamera.position.copy(bottle.position);
         cubeCamera.update(renderer, scene);
-        // bottle.visible = true;
     }
-    
+
     renderer.render(scene, camera);
 }
 
-// Function to update video plane size to cover screen
 function updateVideoPlaneSize() {
+    if (!videoPlane) return;
+
     const distance = Math.abs(videoPlane.position.z - camera.position.z);
     const vFov = camera.fov * Math.PI / 180;
     const planeHeight = 2 * Math.tan(vFov / 2) * distance;
     const planeWidth = planeHeight * camera.aspect;
-    
-    // Video aspect ratio is 16:9
+
     const videoAspect = 16 / 9;
-    const screenAspect = camera.aspect;
-    
-    // Scale to cover the screen (crop instead of squish)
-    if (screenAspect > videoAspect) {
-        // Screen is wider than video, fit to width
-        const scale = planeWidth / 16;
-        videoPlane.scale.set(scale, scale, 1);
-    } else {
-        // Screen is taller than video, fit to height
-        const scale = planeHeight / 9;
-        videoPlane.scale.set(scale, scale, 1);
-    }
+    const scale = camera.aspect > videoAspect
+        ? planeWidth / 16
+        : planeHeight / 9;
+
+    videoPlane.scale.setScalar(scale);
 }
+
+function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    updateVideoPlaneSize();
+}
+
+
+console.log(`
+mm           mm        mm     mmmmmmmm mmm    mmm             mmmm    mmmmmmmm  mm    mm  mmmmm      mmmmmm     mmmm   
+##          ####      ####    """""###  ##m  m##            m#""""#   """##"""  ##    ##  ##"""##    ""##""    ##""##  
+##          ####      ####        ##"    ##mm##             ##m          ##     ##    ##  ##    ##     ##     ##    ## 
+##         ##  ##    ##  ##     m##"      "##"               "####m      ##     ##    ##  ##    ##     ##     ##    ## 
+##         ######    ######    m##         ##                    "##     ##     ##    ##  ##    ##     ##     ##    ## 
+##mmmmmm  m##  ##m  m##  ##m  ###mmmmm     ##               #mmmmm#"     ##     "##mm##"  ##mmm##    mm##mm    ##mm##  
+""""""""  ""    ""  ""    ""  """"""""     ""                """""       ""       """"    """""      """"""     """"   
+`);
